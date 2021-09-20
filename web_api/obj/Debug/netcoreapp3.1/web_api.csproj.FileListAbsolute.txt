@@ -47,3 +47,4 @@
 /home/slava/C#/web_api/web_api/bin/Debug/netcoreapp3.1/System.Collections.Immutable.dll
 /home/slava/C#/web_api/web_api/bin/Debug/netcoreapp3.1/System.ComponentModel.Annotations.dll
 /home/slava/C#/web_api/web_api/bin/Debug/netcoreapp3.1/System.Diagnostics.DiagnosticSource.dll
+/home/slava/C#/web_api/web_api/bin/Debug/netcoreapp3.1/BCrypt.Net-Next.dll

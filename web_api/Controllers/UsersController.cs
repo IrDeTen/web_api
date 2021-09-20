@@ -16,11 +16,6 @@ namespace web_api.Controllers
 
     public class UsersController : ControllerBase
     {
-        private List<User> users = new List<User>
-        {
-            new User {Name="internal", Password="pass", Internal=true},
-            new User {Name="external", Password="pass2", Internal=false}
-        };
         private ApplicationContext db;
         public UsersController(ApplicationContext context)
         {
@@ -30,67 +25,74 @@ namespace web_api.Controllers
         [HttpPost("registration")]
         public async Task<IActionResult> Create(User user)
         {
+            var err = CheckUser(user);
+            if (err == null)
+            {
+                return BadRequest(new {Status = "error", Error = "User already exist"});
+            }
+
+            user.Password = BCrypt.Net.BCrypt.EnhancedHashPassword(user.Password);
             db.Users.Add(user);
             await db.SaveChangesAsync();
-            return new JsonResult(await db.Users.ToListAsync());
+            user = db.Users.FirstOrDefault(u => u.Name == user.Name);
+            
+            var jwt = FormJWTToken(user);
+
+            return new JsonResult(new {id = user.ID, token = jwt} );
         }
 
         [HttpPost("auth")]
         public IActionResult Auth(User user)
+        {   
+            var err = CheckUser(user);
+            if (err != null)
+            {
+                return BadRequest(err);
+            } 
+            var jwt = FormJWTToken(user);
+
+            return Ok(new {token = jwt} );
+        }
+
+        private object CheckUser(User user)
         {
-            var identify = GetIdentity(user);
-            if (identify == null)
+            var existUser = db.Users.FirstOrDefault(u => u.Name == user.Name);
+            if (existUser == null)
             {
-                return BadRequest(new {errorText = "Invalid username or password"});
+                return new { Status = "error", Error = "User not found"};
             }
-            
-            bool isInternal = users.FirstOrDefault( x=> x.Name == user.Name).Internal;
+            if (!BCrypt.Net.BCrypt.EnhancedVerify(user.Password,existUser.Password))
+            {
+                return new { Status = "error", Error = "Wrong password"};
+            }
+            return null;
+        }
 
+        private string FormJWTToken(User user)
+        {            
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimsIdentity.DefaultNameClaimType, user.Name),
+            };
 
+            ClaimsIdentity claimsIden = 
+            new ClaimsIdentity(claims, "Token", ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType);
+
+            bool isInternal = db.Users.FirstOrDefault( x=> x.Name == user.Name).Internal;
             var now = DateTime.UtcNow;
-            DateTime exp;
-            if (isInternal)
-            {
-               exp = now.AddHours(AuthOptions.LIFETIME); 
-            } else 
-            {
-                exp = now.AddHours(AuthOptions.LIFETIME_EXT); 
-            }
 
             var jwt = new JwtSecurityToken(
                 issuer: AuthOptions.ISSUER,
                 audience: AuthOptions.AUDIENCE,
                 notBefore: now,
-                claims: identify.Claims,
-                expires: exp,
+                claims: claimsIden.Claims,
+                expires: now.AddMinutes(isInternal ? AuthOptions.LIFETIME : AuthOptions.LIFETIME_EXT),
                 signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256)
             );
 
             var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt);
-            var result = new 
-                {
-                token = encodedJwt,
-                expires = exp.ToLocalTime()
-                };
 
-            return new JsonResult(result);
-        }
-
-        private ClaimsIdentity GetIdentity(User signInUser)
-        {
-            //TODO добавить базу данных
-            User user = users.FirstOrDefault( x=> x.Name == signInUser.Name && x.Password == signInUser.Password);
-            if (user != null)
-            {
-                var claims = new List<Claim>
-                {
-                    new Claim(ClaimsIdentity.DefaultNameClaimType, user.Name),
-                };
-                ClaimsIdentity claimsIden = 
-                new ClaimsIdentity(claims, "Token", ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType);
-            return claimsIden;
-            }
-            return null;
+            return encodedJwt;
         }
     }
 

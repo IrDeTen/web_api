@@ -41,9 +41,7 @@ namespace web_api
                         };
                     });
             
-            // получаем строку подключения из файла конфигурации
             string connection = "server=127.0.0.1;port=3106;user=root;password=pass;database=web_api;";
-            // добавляем контекст MobileContext в качестве сервиса в приложение
             services.AddDbContext<ApplicationContext>(options =>
                 options.UseMySql(connection, new MySqlServerVersion(new System.Version(8,0,23))));
         }
