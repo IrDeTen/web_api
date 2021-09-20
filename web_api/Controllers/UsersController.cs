@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using web_api.Models;
 
 namespace web_api.Controllers
 {
@@ -17,10 +20,23 @@ namespace web_api.Controllers
         {
             new User {Name="internal", Password="pass", Internal=true},
             new User {Name="external", Password="pass2", Internal=false}
-        }; 
+        };
+        private ApplicationContext db;
+        public UsersController(ApplicationContext context)
+        {
+            db = context;
+        }
 
         [HttpPost("registration")]
-        public IActionResult Post(User user)
+        public async Task<IActionResult> Create(User user)
+        {
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+            return new JsonResult(await db.Users.ToListAsync());
+        }
+
+        [HttpPost("auth")]
+        public IActionResult Auth(User user)
         {
             var identify = GetIdentity(user);
             if (identify == null)
