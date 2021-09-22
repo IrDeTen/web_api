@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Models.Users;
 
-namespace web_api.Models
+namespace Models.ApplicationContext
 {
-  public class ApplicationContext : DbContext
+  public class AppDBContext : DbContext
   {
       public DbSet<User> Users { get; set; }
-      public ApplicationContext(DbContextOptions<ApplicationContext> options)
+      public AppDBContext(DbContextOptions<AppDBContext> options)
           : base(options)
       {
           Database.EnsureCreated();   // создаем базу данных при первом обращении

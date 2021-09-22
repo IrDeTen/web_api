@@ -3,10 +3,15 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using web_api.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Models.ApplicationContext;
+using web_api.Repositories;
+using web_api.Repositories.UserRepository;
+using web_api.Options;
+using web_api.Usecases;
+using web_api.Usecases.AuthUC;
 
 namespace web_api
 {
@@ -42,8 +47,10 @@ namespace web_api
                     });
             
             string connection = "server=127.0.0.1;port=3106;user=root;password=pass;database=web_api;";
-            services.AddDbContext<ApplicationContext>(options =>
+            services.AddDbContext<AppDBContext>(options =>
                 options.UseMySql(connection, new MySqlServerVersion(new System.Version(8,0,23))));
+            services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IAuthUC, AuthUC>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)

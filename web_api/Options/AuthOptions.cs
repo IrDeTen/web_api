@@ -1,6 +1,8 @@
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
  
+namespace web_api.Options
+{
     public class AuthOptions
     {
         public const string ISSUER = "server"; // издатель токена
@@ -13,3 +15,4 @@ using System.Text;
             return new SymmetricSecurityKey(Encoding.ASCII.GetBytes(KEY));
         }
     }
+}

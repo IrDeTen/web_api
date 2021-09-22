@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.EntityFrameworkCore;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using web_api.Models;
+using Models.Users;
+using Models.Response;
+using web_api.Usecases;
 
 namespace web_api.Controllers
 {
@@ -16,86 +14,40 @@ namespace web_api.Controllers
 
     public class UsersController : ControllerBase
     {
-        private ApplicationContext db;
-        public UsersController(ApplicationContext context)
+        private IAuthUC _authUC;
+        public UsersController(IAuthUC authUC)
         {
-            db = context;
+            _authUC = authUC;
         }
 
-        [HttpPost("registration")]
-        public async Task<IActionResult> Create(User user)
+        [HttpPost("sign_up")]
+        public IActionResult SignUp(User user)
         {
-            var err = CheckUser(user);
-            if (err == null)
-            {
-                return BadRequest(new {Status = "error", Error = "User already exist"});
-            }
-
-            user.Password = BCrypt.Net.BCrypt.EnhancedHashPassword(user.Password);
-            db.Users.Add(user);
-            await db.SaveChangesAsync();
-            user = db.Users.FirstOrDefault(u => u.Name == user.Name);
-            
-            var jwt = FormJWTToken(user);
-
-            return new JsonResult(new {id = user.ID, token = jwt} );
-        }
-
-        [HttpPost("auth")]
-        public IActionResult Auth(User user)
-        {   
-            var err = CheckUser(user);
-            if (err != null)
-            {
-                return BadRequest(err);
+            int id;
+            string token;
+            try {          
+                (id, token) = _authUC.SignUp(user);
+            } catch (UserAlreadyExist) {
+                return BadRequest(new ErrorResponse("User already exist"));
             } 
-            var jwt = FormJWTToken(user);
 
-            return Ok(new {token = jwt} );
+            return Ok(new RegisterResponse(token, id));
         }
 
-        private object CheckUser(User user)
-        {
-            var existUser = db.Users.FirstOrDefault(u => u.Name == user.Name);
-            if (existUser == null)
-            {
-                return new { Status = "error", Error = "User not found"};
+        [HttpPost("sign_in")]
+        public IActionResult SignIn(User user)
+        {   
+            string token;
+            try {
+                token = _authUC.SignIn(user);
+            } catch (UserNotFound) {
+                return BadRequest(new ErrorResponse("User not found"));
+            } catch (WrongPassword) {
+                return BadRequest(new ErrorResponse("Wrong user password"));
             }
-            if (!BCrypt.Net.BCrypt.EnhancedVerify(user.Password,existUser.Password))
-            {
-                return new { Status = "error", Error = "Wrong password"};
-            }
-            return null;
-        }
-
-        private string FormJWTToken(User user)
-        {            
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimsIdentity.DefaultNameClaimType, user.Name),
-            };
-
-            ClaimsIdentity claimsIden = 
-            new ClaimsIdentity(claims, "Token", ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType);
-
-            bool isInternal = db.Users.FirstOrDefault( x=> x.Name == user.Name).Internal;
-            var now = DateTime.UtcNow;
-
-            var jwt = new JwtSecurityToken(
-                issuer: AuthOptions.ISSUER,
-                audience: AuthOptions.AUDIENCE,
-                notBefore: now,
-                claims: claimsIden.Claims,
-                expires: now.AddMinutes(isInternal ? AuthOptions.LIFETIME : AuthOptions.LIFETIME_EXT),
-                signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256)
-            );
-
-            var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt);
-
-            return encodedJwt;
+            return Ok(new AuthResponse(token) );
         }
     }
-
 }
 
 
